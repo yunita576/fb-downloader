@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FB Downloader - Video & Gambar</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
+    <style>
+        body {
+            background-color: #f0f4f8; /* Abu sangat terang / putih kebiruan */
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        .fb-blue {
+            background-color: #1877F2; /* Warna Biru Facebook */
+        }
+        .fb-blue-hover:hover {
+            background-color: #166fe5;
+        }
+        .glass-card {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        .loader {
+            border-top-color: #1877F2;
+            -webkit-animation: spinner 1.5s linear infinite;
+            animation: spinner 1.5s linear infinite;
+        }
+        @keyframes spinner {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col items-center justify-center p-4">
+
+    <!-- Header / Branding -->
+    <div class="text-center mb-8">
+        <h1 class="text-5xl font-bold text-[#1877F2] flex items-center justify-center gap-3">
+            <!-- Logo Kotak Facebook -->
+            <i class="fa-brands fa-square-facebook text-6xl"></i> FB Downloader
+        </h1>
+        <p class="text-gray-500 mt-3 text-lg">Unduh Video & Gambar dari Facebook dengan Cepat</p>
+    </div>
+
+    <!-- Main Card -->
+    <div class="glass-card w-full max-w-xl rounded-2xl shadow-2xl p-8">
+        
+        <!-- Input Section (Vertikal) -->
+        <div class="mb-6">
+            <input 
+                type="text" 
+                id="fbUrl" 
+                placeholder="Tempel link Facebook di sini..." 
+                class="w-full p-4 text-gray-700 focus:outline-none border-2 border-gray-200 rounded-xl focus:border-[#1877F2] transition-colors text-lg"
+            >
+            <button 
+                onclick="downloadMedia()" 
+                id="btnDownload"
+                class="w-full fb-blue fb-blue-hover text-white py-4 rounded-xl font-semibold transition-colors flex items-center justify-center gap-2 text-lg mt-4 shadow-md hover:shadow-lg"
+            >
+                <i class="fa-solid fa-download"></i> Unduh
+            </button>
+        </div>
+
+        <!-- Loading State -->
+        <div id="loading" class="hidden flex justify-center my-8">
+            <div class="loader ease-linear rounded-full border-4 border-t-4 border-gray-200 h-12 w-12"></div>
+        </div>
+
+        <!-- Result Section -->
+        <div id="result" class="hidden">
+            <div class="bg-gray-50 rounded-xl p-5 border border-gray-100">
+                <h3 id="mediaTitle" class="font-semibold text-gray-800 mb-4 truncate text-center"></h3>
+                
+                <div id="videoContainer" class="hidden mb-4">
+                    <video id="videoPlayer" controls class="w-full rounded-lg shadow-sm bg-black"></video>
+                </div>
+                
+                <div id="imageContainer" class="hidden mb-4">
+                    <img id="imagePreview" src="" alt="Preview" class="w-full rounded-lg shadow-sm object-cover max-h-96">
+                </div>
+
+                <a id="downloadLink" href="#" target="_blank" 
+                   class="block w-full text-center fb-blue fb-blue-hover text-white py-3 rounded-lg font-semibold transition-colors mt-2 shadow-sm">
+                    <i class="fa-solid fa-arrow-down"></i> Simpan ke Perangkat
+                </a>
+            </div>
+        </div>
+
+        <!-- Error Message -->
+        <div id="errorMsg" class="hidden bg-red-50 text-red-600 p-4 rounded-xl text-center border border-red-100 font-medium"></div>
+    </div>
+
+    <!-- Footer -->
+    <p class="text-gray-400 text-sm mt-8">Hanya mendukung konten publik. Konten privat tidak dapat diunduh.</p>
+
+    <script>
+        async function downloadMedia() {
+            const urlInput = document.getElementById('fbUrl').value;
+            const resultDiv = document.getElementById('result');
+            const loadingDiv = document.getElementById('loading');
+            const errorMsg = document.getElementById('errorMsg');
+            const btnDownload = document.getElementById('btnDownload');
+            
+            // Reset state
+            resultDiv.classList.add('hidden');
+            errorMsg.classList.add('hidden');
+            
+            if (!urlInput) {
+                showError('Silakan masukkan URL Facebook terlebih dahulu!');
+                return;
+            }
+
+            // Show loading
+            loadingDiv.classList.remove('hidden');
+            btnDownload.disabled = true;
+            btnDownload.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Memproses...';
+
+            try {
+                const response = await fetch('/api/download', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ url: urlInput })
+                });
+
+                const data = await response.json();
+                
+                if (!response.ok) {
+                    throw new Error(data.error || 'Terjadi kesalahan saat mengambil data.');
+                }
+
+                // Populate result
+                document.getElementById('mediaTitle').textContent = data.title;
+                
+                const videoContainer = document.getElementById('videoContainer');
+                const imageContainer = document.getElementById('imageContainer');
+                const downloadLink = document.getElementById('downloadLink');
+
+                if (data.videoUrl) {
+                    document.getElementById('videoPlayer').src = data.videoUrl;
+                    videoContainer.classList.remove('hidden');
+                    imageContainer.classList.add('hidden');
+                    downloadLink.href = data.videoUrl;
+                    downloadLink.innerHTML = '<i class="fa-solid fa-arrow-down"></i> Unduh Video';
+                } else if (data.imageUrl) {
+                    document.getElementById('imagePreview').src = data.imageUrl;
+                    imageContainer.classList.remove('hidden');
+                    videoContainer.classList.add('hidden');
+                    downloadLink.href = data.imageUrl;
+                    downloadLink.innerHTML = '<i class="fa-solid fa-arrow-down"></i> Unduh Gambar';
+                }
+
+                resultDiv.classList.remove('hidden');
+
+            } catch (error) {
+                showError(error.message);
+            } finally {
+                loadingDiv.classList.add('hidden');
+                btnDownload.disabled = false;
+                btnDownload.innerHTML = '<i class="fa-solid fa-download"></i> Unduh';
+            }
+        }
+
+        function showError(message) {
+            const errorMsg = document.getElementById('errorMsg');
+            errorMsg.textContent = message;
+            errorMsg.classList.remove('hidden');
+        }
+    </script>
+</body>
+</html>

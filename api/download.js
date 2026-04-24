@@ -1,8 +1,7 @@
 const axios = require('axios');
-const cheerio = require('cheerio');
 
 module.exports = async (req, res) => {
-  // Set CORS agar frontend bisa mengakses API ini
+  // Set CORS
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
@@ -22,46 +21,42 @@ module.exports = async (req, res) => {
   }
 
   try {
-    // Fetch halaman Facebook dengan User-Agent agar tidak diblokir
-    const response = await axios.get(url, {
+    // Menggunakan RapidAPI untuk mengambil data
+    const options = {
+      method: 'GET',
+      url: 'https://facebook-reel-and-video-downloader.p.rapidapi.com/app/main_download',
+      params: {
+        url: url,
+        platform: 'facebook'
+      },
       headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36'
+        // PENTING: GANTI INI DENGAN KUNCI API ANDA DARI RAPIDAPI
+        'X-RapidAPI-Key': '6eb874512fmshede2e929ee8df48p1e6f1ajsn917f381d654b',
+        'X-RapidAPI-Host': 'facebook-reel-and-video-downloader.p.rapidapi.com'
       }
-    });
+    };
 
-    const html = response.data;
-    const $ = cheerio.load(html);
+    const response = await axios.request(options);
+    const apiData = response.data;
 
-    let videoUrl = null;
-    let imageUrl = null;
-    let title = $('title').text() || 'Facebook Media';
+    // Memastikan API mengembalikan link video
+    if (apiData && apiData.versions && apiData.versions.length > 0) {
+      // Mengambil kualitas video terbaik (biasanya index pertama)
+      const videoUrl = apiData.versions[0].download_url;
+      const title = apiData.title || 'Facebook Video';
 
-    // Cari meta tag og:video (untuk video)
-    const ogVideo = $('meta[property="og:video"]').attr('content') || 
-                    $('meta[property="og:video:url"]').attr('content') ||
-                    $('meta[property="og:video:secure_url"]').attr('content');
-
-    // Cari meta tag og:image (untuk gambar)
-    const ogImage = $('meta[property="og:image"]').attr('content') || 
-                    $('meta[property="og:image:url"]').attr('content');
-
-    if (ogVideo) {
-      videoUrl = ogVideo;
-    } else if (ogImage) {
-      imageUrl = ogImage;
+      return res.status(200).json({
+        success: true,
+        title: title,
+        videoUrl: videoUrl,
+        imageUrl: null // API ini fokus pada video
+      });
     } else {
-      return res.status(404).json({ error: 'Video atau Gambar tidak ditemukan. Pastikan link bersifat publik.' });
+      return res.status(404).json({ error: 'Video tidak ditemukan. Pastikan link valid dan publik.' });
     }
 
-    return res.status(200).json({
-      success: true,
-      title: title,
-      videoUrl: videoUrl,
-      imageUrl: imageUrl
-    });
-
   } catch (error) {
-    console.error(error);
-    return res.status(500).json({ error: 'Gagal mengambil data. Facebook mungkin memblokir request ini atau post bersifat privat.' });
+    console.error(error.response ? error.response.data : error.message);
+    return res.status(500).json({ error: 'Gagal mengambil data. Coba lagi nanti atau gunakan link berbeda.' });
   }
 };
